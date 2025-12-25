@@ -1,66 +1,125 @@
-document.addEventListener('DOMContentLoaded', function(){
+document.addEventListener('DOMContentLoaded', function () {
+
   var NRKBCQ = 'nrkbetaquiz';
-  
-  var parseQuiz = function(str){
-    try{return JSON.parse(decodeURIComponent(str || ''))}
-    catch(err){return []}
-  };
 
-  var removeQuiz = function(quizNode, formNode){
-    quizNode.style.height = quizNode.offsetHeight + 'px';
-    formNode.style.height = formNode.scrollHeight + 'px';
-    quizNode.style.height = '0px';
-    setTimeout(function(){
-      quizNode.style.display = 'none';
-      formNode.style.height = 'auto';
-    }, 500);
-  };
+  document.querySelectorAll('.' + NRKBCQ).forEach(function (quizNode) {
 
-  var buildAnswer = function(text, name, value){
-    var label = document.createElement('label');
-    var input = label.appendChild(document.createElement('input'));
-    var title = label.appendChild(document.createTextNode(text));
+    var form = quizNode.nextElementSibling;
+    var data = quizNode.getAttribute('data-' + NRKBCQ);
 
-    input.type = 'radio';
-    input.name = name;
-    input.value = value;
-    return label;
-  };
-  
-  var buildQuiz = function(quizNode){
-    var formNode = quizNode.nextElementSibling;
-    var errorText = quizNode.getAttribute('data-' + NRKBCQ + '-error');
-    var questions = parseQuiz(quizNode.getAttribute('data-' + NRKBCQ));
-    var correctId = NRKBCQ + location.pathname + questions.map(function(q){return q.correct}).join('');
-    var errorNode = document.createElement('h3').appendChild(document.createTextNode(errorText)).parentNode;
-    var container = document.createElement('div');
-    
-    if(localStorage.getItem(correctId) === correctId){  //Skip quiz if already solved
-      return quizNode.parentNode.removeChild(quizNode);
+    if (!form || !data) return;
+
+    var questions;
+    try {
+      questions = JSON.parse(decodeURIComponent(data));
+    } catch (e) {
+      return;
     }
 
-    questions.forEach(function(question, index){
-      container.appendChild(document.createElement('h2')).textContent = question.text;  //Render title
-      question.answer
-        .map(function(key, val){return key && buildAnswer(key, NRKBCQ + index, val)})
-        .sort(function(){return 0.5 - Math.random()})
-        .forEach(function(node){node && container.appendChild(node)});
+    if (!questions.length) return;
+
+    /* ========= LOCK COMMENT FORM INITIALLY ========= */
+    form.querySelectorAll('textarea, input[type=submit]')
+      .forEach(el => el.disabled = true);
+
+    /* ========= TIMER (10 SECONDS) ========= */
+    var timeLeft = 10;
+    var timerExpired = false;
+
+    var timerNode = document.createElement('p');
+    timerNode.style.fontWeight = 'bold';
+    timerNode.style.color = 'red';
+    timerNode.textContent = '⏱ Time left: 10 seconds';
+    quizNode.appendChild(timerNode);
+
+    var timer = setInterval(function () {
+      timeLeft--;
+      timerNode.textContent = '⏱ Time left: ' + timeLeft + ' seconds';
+
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        timerExpired = true;
+        timerNode.textContent = '⏰ Time over! You cannot comment.';
+
+        quizNode.querySelectorAll('input[type="radio"]')
+          .forEach(i => i.disabled = true);
+
+        form.querySelectorAll('textarea, input[type=submit]')
+          .forEach(el => el.disabled = true);
+      }
+    }, 1000);
+
+    /* ========= BUILD QUIZ ========= */
+    var container = document.createElement('div');
+    quizNode.appendChild(container);
+
+    questions.forEach(function (q, i) {
+      container.appendChild(document.createElement('h3')).textContent = q.text;
+
+      q.answer.forEach(function (ans, idx) {
+        if (!ans) return;
+
+        var label = document.createElement('label');
+        var input = document.createElement('input');
+
+        input.type = 'radio';
+        input.name = NRKBCQ + i;
+        input.value = idx;
+
+        label.appendChild(input);
+        label.append(' ' + ans);
+
+        container.appendChild(label);
+        container.appendChild(document.createElement('br'));
+      });
     });
 
-    quizNode.appendChild(container);
-    quizNode.addEventListener('change', function(){
-      var checked = questions.map(function(q,i){return container.querySelector('input[name="' + NRKBCQ + i + '"]:checked')});
-      var correct = questions.every(function(q,i){return checked[i] && Number(checked[i].value) === Number(q.correct)});
-      var failure = !correct && checked.filter(Boolean).length === questions.length;
-      
-      if(correct){
-        localStorage.setItem(correctId, correctId);
-        removeQuiz(quizNode, formNode);
-      }else if(failure){
-        container.appendChild(errorNode);
+    /* ========= ONE-ATTEMPT + GLOW HANDLING ========= */
+    var answeredOnce = false;
+
+    quizNode.addEventListener('change', function (e) {
+
+      if (timerExpired || answeredOnce) return;
+      if (!e.target || e.target.type !== 'radio') return;
+
+      answeredOnce = true;     // 🔒 only one attempt
+      clearInterval(timer);   // stop timer
+
+      // Disable all options
+      quizNode.querySelectorAll('input[type="radio"]')
+        .forEach(i => i.disabled = true);
+
+      // Remove previous glow
+      container.querySelectorAll('label')
+        .forEach(l => l.classList.remove('correct', 'wrong'));
+
+      var input = e.target;
+      var label = input.parentElement;
+
+      var questionIndex = parseInt(
+        input.name.replace(NRKBCQ, ''),
+        10
+      );
+
+      var isCorrect =
+        Number(input.value) === Number(questions[questionIndex].correct);
+
+      if (isCorrect) {
+        label.classList.add('correct');
+
+        // ✅ unlock comment form
+        form.querySelectorAll('textarea, input[type=submit]')
+          .forEach(el => el.disabled = false);
+
+      } else {
+        label.classList.add('wrong');
+
+        // ❌ permanently locked
+        form.querySelectorAll('textarea, input[type=submit]')
+          .forEach(el => el.disabled = true);
       }
     });
-  };
-  
-  [].forEach.call(document.querySelectorAll('.' + NRKBCQ), buildQuiz);
+
+  });
+
 });

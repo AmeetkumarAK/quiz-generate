@@ -1,27 +1,24 @@
-.nrkbetaquiz,
-.nrkbetaquiz + * {
-  overflow: hidden;
-  transition: .5s;
-  height: 0;
+.nrkbetaquiz {
+  border: 2px solid #ccc;
+  padding: 15px;
+  margin-bottom: 20px;
 }
-.nrkbetaquiz { height: auto }
+
 .nrkbetaquiz label {
   cursor: pointer;
-  display: inline-block;
-  margin: 0 7px 6px 0;
-  border-radius: 5px;
-  padding: 10px 15px;
-  background: #eee;
-  transition: .2s;
+  display: block;
+  margin: 5px 0;
 }
-.nrkbetaquiz label:hover {
-  background: #ccc;
+
+/* Glow effects for quiz answers */
+.nrkbetaquiz label.correct {
+  border: 2px solid #2ecc71;
+  background-color: #eafaf1;
+  box-shadow: 0 0 10px #2ecc71;
 }
-.nrkbetaquiz h3 {
-  color: red;
-  font: inherit;
-  animation: nrkbetaquiz forward;
-}
-@keyframes nrkbetaquiz{
-  from{transform:scale(0)}
+
+.nrkbetaquiz label.wrong {
+  border: 2px solid #e74c3c;
+  background-color: #fdecea;
+  box-shadow: 0 0 10px #e74c3c;
 }
